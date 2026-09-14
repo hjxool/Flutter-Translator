@@ -1,0 +1,9 @@
+{
+  "dart.flutterSdkPath": "前端项目/.fvm/versions/stable",
+  "search.exclude": {
+    "**/.fvm": true
+  },
+  "files.watcherExclude": {
+    "**/.fvm": true
+  }
+}
