@@ -10,7 +10,6 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   int _selectedWordIndex = 0;
-  int _selectedBottomNav = 0;
   final List<Map<String, String>> _wordList = [
     {'word': 'register', 'def': 'vt. 记录；注册；登记；把...挂号；挂...'},
     {'word': 'registror', 'def': 'n. 暂存器'},
@@ -62,7 +61,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  // 左侧边栏（搜索框 + 词条列表 + 底部导航栏）
+  // 左侧边栏（搜索框 + 词条列表）
   Widget _buildLeftSidebar() {
     return Container(
       color: const Color(0xFF181818),
@@ -134,41 +133,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               },
             ),
           ),
-          const Divider(height: 1, color: Color(0xFF282828)),
-          // 底部 4 个导航栏按钮
-          Container(
-            height: 48,
-            color: const Color(0xFF181818),
-            child: Row(
-              children: [
-                _buildBottomNavItem(Icons.search, '查找', 0),
-                _buildBottomNavItem(Icons.book_outlined, '生词本', 1),
-                _buildBottomNavItem(Icons.edit_outlined, '笔记', 2),
-                _buildBottomNavItem(Icons.access_time, '历史', 3),
-              ],
-            ),
-          ),
         ],
-      ),
-    );
-  }
-
-  // 导航栏按钮
-  Widget _buildBottomNavItem(IconData icon, String label, int index) {
-    final isSelected = _selectedBottomNav == index;
-    final color = isSelected ? Colors.lightBlueAccent : Colors.grey;
-
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _selectedBottomNav = index),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(height: 2),
-            Text(label, style: TextStyle(fontSize: 10, color: color)),
-          ],
-        ),
       ),
     );
   }
@@ -178,199 +143,157 @@ class _HomePageState extends ConsumerState<HomePage> {
     return Container(
       color: const Color(0xFF141414),
       child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        children: [
+          // 单词大标题
+          const Text(
+            'register',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // 音标与跟读按钮
+          Row(
             children: [
-              // 单词大标题与收藏五角星
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text(
-                    'register',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+              _buildPhonetic(
+                icon: Icons.volume_up_outlined,
+                label: "英 /'redʒɪstə(r)/",
+              ),
+              const SizedBox(width: 16),
+              _buildPhonetic(
+                icon: Icons.volume_up_outlined,
+                label: "美 /'redʒɪstər/",
+              ),
+              const SizedBox(width: 16),
+              _buildActionButton(Icons.mic_none, '跟读'),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 标签
+          // Wrap 相当于自动换行的Row
+          Wrap(
+            spacing: 6, // 相邻元素间距
+            children: ['高考', '四级', '六级', '考研']
+                .map(
+                  (tag) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
                     ),
-                  ),
-                  Icon(Icons.star_border, color: Colors.grey, size: 22),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // 音标与跟读按钮
-              Row(
-                children: [
-                  _buildPhonetic(
-                    icon: Icons.volume_up_outlined,
-                    label: "英 /'redʒɪstə(r)/",
-                  ),
-                  const SizedBox(width: 16),
-                  _buildPhonetic(
-                    icon: Icons.volume_up_outlined,
-                    label: "美 /'redʒɪstər/",
-                  ),
-                  const SizedBox(width: 16),
-                  _buildActionButton(Icons.mic_none, '跟读'),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // 标签
-              // Wrap 相当于自动换行的Row
-              Wrap(
-                spacing: 6, // 相邻元素间距
-                children: ['高考', '四级', '六级', '考研']
-                    .map(
-                      (tag) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2A2A2A),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Text(
-                          tag,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: 20),
-              // 英汉-汉英词典
-              _buildSectionHeader('英汉-汉英词典'),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          '1. vt. 记录；注册；登记；把...挂号；挂号邮寄；正式提出',
-                          style: TextStyle(
-                            color: Color(0xFFCCCCCC),
-                            fontSize: 13,
-                            height: 1.5,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          '2. vi. 登记；注册；挂号',
-                          style: TextStyle(
-                            color: Color(0xFFCCCCCC),
-                            fontSize: 13,
-                            height: 1.5,
-                          ),
-                        ),
-                        SizedBox(height: 6),
-                        // 富文本 传入可嵌套的TextSpan 每个都单独设置样式
-                        Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(
-                                text: '时态: ',
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              TextSpan(
-                                text: 'registered, registering, registers',
-                                style: TextStyle(
-                                  color: Colors.blueAccent,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(
-                                text: '形容词: ',
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              TextSpan(
-                                text: 'registrable',
-                                style: TextStyle(
-                                  color: Colors.blueAccent,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // 右侧缩略配图占位
-                  Container(
-                    width: 72,
-                    height: 52,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade800,
-                      borderRadius: BorderRadius.circular(4),
+                      color: const Color(0xFF2A2A2A),
+                      borderRadius: BorderRadius.circular(3),
                     ),
-                    child: const Icon(
-                      Icons.image,
-                      color: Colors.grey,
-                      size: 28,
+                    child: Text(
+                      tag,
+                      style: const TextStyle(fontSize: 10, color: Colors.grey),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              // 近义、反义、联想词
-              _buildSectionHeader('近义、反义、联想词'),
-              const SizedBox(height: 8),
-              const Text(
-                '近义词',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'n. written record, written account, timbre, timber, quality, tone, record',
-                style: TextStyle(color: Colors.blueAccent, fontSize: 12),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'v. record, enter, put down, enroll, inscribe, enrol, recruit',
-                style: TextStyle(color: Colors.blueAccent, fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '联想词',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'registration 注册;  login 进入系统;  enroll 【美】加入;  log 原木;  participate 参加, 参与;  enter 进入;  sign 符号;  submit 使服从;',
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 20),
+          // 英汉-汉英词典
+          _buildSectionHeader('英汉-汉英词典'),
+          const SizedBox(height: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                '1. vt. 记录；注册；登记；把...挂号；挂号邮寄；正式提出',
                 style: TextStyle(
                   color: Color(0xFFCCCCCC),
-                  fontSize: 12,
-                  height: 1.4,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                '2. vi. 登记；注册；挂号',
+                style: TextStyle(
+                  color: Color(0xFFCCCCCC),
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              SizedBox(height: 6),
+              // 富文本 传入可嵌套的TextSpan 每个都单独设置样式
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '时态: ',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    TextSpan(
+                      text: 'registered, registering, registers',
+                      style: TextStyle(color: Colors.blueAccent, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 2),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '形容词: ',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    TextSpan(
+                      text: 'registrable',
+                      style: TextStyle(color: Colors.blueAccent, fontSize: 12),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 20),
+          // 近义、反义、联想词
+          _buildSectionHeader('近义、反义、联想词'),
+          const SizedBox(height: 8),
+          const Text(
+            '近义词',
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'n. written record, written account, timbre, timber, quality, tone, record',
+            style: TextStyle(color: Colors.blueAccent, fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'v. record, enter, put down, enroll, inscribe, enrol, recruit',
+            style: TextStyle(color: Colors.blueAccent, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '联想词',
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'registration 注册;  login 进入系统;  enroll 【美】加入;  log 原木;  participate 参加, 参与;  enter 进入;  sign 符号;  submit 使服从;',
+            style: TextStyle(
+              color: Color(0xFFCCCCCC),
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
