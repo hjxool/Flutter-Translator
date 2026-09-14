@@ -21,69 +21,56 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
+      body: Row(
         children: [
-          _buildTopBar(),
-          // 分割线
-          const Divider(height: 1, color: Color(0xFF282828)),
-          // 主体部分：左侧列表 + 右侧内容
-          Expanded(
-            child: Row(
-              children: [
-                // 左侧栏
-                SizedBox(width: 260, child: _buildLeftSidebar()),
-                const VerticalDivider(width: 1, color: Color(0xFF282828)),
-                // 右侧词典详情区
-                Expanded(child: _buildRightDetail()),
-              ],
-            ),
-          ),
+          // 左侧栏
+          SizedBox(width: 260, child: _buildLeftSidebar()),
+          const VerticalDivider(width: 1, color: Color(0xFF282828)),
+          // 右侧词典详情区
+          Expanded(child: _buildRightDetail()),
         ],
       ),
     );
   }
 
-  // 顶部标题栏 / 搜索栏
-  Widget _buildTopBar() {
+  // 搜索输入框
+  Widget _buildSearchBox() {
     return Container(
       height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      color: const Color(0xFF1E1E1E),
-      child: Row(
-        children: [
-          // 搜索输入框
-          Container(
-            width: 200,
-            height: 30,
-            decoration: BoxDecoration(
-              color: const Color(0xFF121212),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: const Color(0xFF333333)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      alignment: Alignment.center,
+      child: Container(
+        height: 30,
+        decoration: BoxDecoration(
+          color: const Color(0xFF121212),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: const Color(0xFF333333)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'register',
+                style: TextStyle(color: Colors.white, fontSize: 13),
+              ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'register',
-                    style: TextStyle(color: Colors.white, fontSize: 13),
-                  ),
-                ),
-                Icon(Icons.clear, size: 14, color: Colors.blue.shade300),
-              ],
-            ),
-          ),
-        ],
+            Icon(Icons.clear, size: 14, color: Colors.blue.shade300),
+          ],
+        ),
       ),
     );
   }
 
-  // 左侧边栏（词条列表 + 底部导航栏）
+  // 左侧边栏（搜索框 + 词条列表 + 底部导航栏）
   Widget _buildLeftSidebar() {
     return Container(
       color: const Color(0xFF181818),
       child: Column(
         children: [
+          // 搜索输入框
+          _buildSearchBox(),
+          const Divider(height: 1, color: Color(0xFF282828)),
           // 搜索匹配出的单词列表
           Expanded(
             child: ListView.builder(
@@ -190,9 +177,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _buildRightDetail() {
     return Container(
       color: const Color(0xFF141414),
-      child: Stack(
-        children: [
-          ListView(
+      child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             children: [
               // 单词大标题与收藏五角星
@@ -386,22 +371,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
             ],
           ),
-          // 悬浮在右侧边缘的蓝色 '+' 添加按钮
-          Positioned(
-            right: 16,
-            bottom: 240,
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E2638),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.blueAccent.withOpacity(0.5)),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
