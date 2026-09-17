@@ -1,0 +1,20 @@
+# 手动指定项目名 否则以当前目录名为项目名 但不能用中文
+name: translator-service
+services:
+  meilisearch:
+    image: getmeili/meilisearch:v1.12
+    container_name: meilisearch-service
+    ports:
+      - "7700:7700"
+    environment:
+      MEILI_ENV: development
+      # API 访问主密钥（后端 Go SDK 连接时需要带上这个 key）
+      MEILI_MASTER_KEY: masterKey123
+      # 可选：禁用匿名用量遥测上报，提升隐私与内网环境下的稳定性
+      MEILI_NO_ANALYTICS: "true"
+    # 使用卷
+    volumes:
+      - meili_data:/meili_data
+# 创建卷
+volumes:
+  meili_data:

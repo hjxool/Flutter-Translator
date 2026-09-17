@@ -1,0 +1,43 @@
+# 数据与数据库文件 (包含 SQLite 数据库及大型数据源)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.csv
+*.tsv
+
+# Go 编译输出与二进制文件
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+main
+server
+app
+
+# Go 测试产物与覆盖率
+*.test
+*.out
+coverage.txt
+
+# Python 缓存 (用于数据导入脚本)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 环境变量与敏感配置
+.env
+.env.*
+!.env.example
+
+# 日志文件
+*.log
+
+# 系统与编辑器缓存
+.DS_Store
+.idea/
+.vscode/
