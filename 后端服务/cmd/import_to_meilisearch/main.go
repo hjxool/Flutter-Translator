@@ -1,6 +1,6 @@
 // 把 SQLite 词条批量推送到 Meilisearch 的同步脚本
 // 不同于python一次性转换 这里用go是因为这是工程中的一部分
-package importtomeilisearch
+package main
 
 import (
 	"time"
@@ -14,6 +14,7 @@ import (
 
 // ⚠️ ECDICT 有 77 万条数据，不能一次性全部加载到内存。采用分批分页的方式推送到Meilisearch
 func main() {
+	logger.Init()
 	common.InitDB()
 	client := common.MeiliClient
 	// 在本地 Go 内存中构造一个 *meilisearch.Index 结构体指针，指定名字叫 "words"，并没有向网络发包
