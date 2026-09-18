@@ -8,7 +8,7 @@ class Request {
   static final Dio _dio =
       Dio(
           BaseOptions(
-            baseUrl: 'http://127.0.0.1:8080',
+            baseUrl: 'http://127.0.0.1:8080/api',
             connectTimeout: const Duration(seconds: 5),
             receiveTimeout: const Duration(seconds: 5),
             headers: {'Content-Type': 'application/json'},
@@ -63,7 +63,7 @@ class Request {
           ),
         );
 
-  static Future<T?> get<T>(
+  static Future get(
     String path, {
     Map<String, dynamic>? queryParameters,
     Options? options,
@@ -74,11 +74,11 @@ class Request {
       options: options,
     );
     // 把data取出 避免外层每次都要then((res) => res.data)
-    return res.data is T ? res.data : null;
+    return res.data;
   }
 
   // ⚠️ 返回值类型可能为null 所以要用T?
-  static Future<T?> post<T>(
+  static Future post(
     String path, {
     dynamic data,
     Map<String, dynamic>? queryParameters,
@@ -92,7 +92,7 @@ class Request {
       options: options,
       cancelToken: cancelToken,
     );
-    return res.data is T ? res.data : null;
+    return res.data;
   }
 }
 
