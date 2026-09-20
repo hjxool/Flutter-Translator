@@ -13,11 +13,21 @@ class Word {
     required this.id,
     required this.word,
     required this.phonetic,
-    required this.definition,
-    required this.translation,
+    required String definition,
+    required String translation,
     required this.tag,
     required this.exchange,
-  });
+  })  : definition = _normalizeNewlines(definition),
+        translation = _normalizeNewlines(translation);
+
+  static String _normalizeNewlines(String text) {
+    if (text.isEmpty) return text;
+    return text
+        .replaceAll(r'\r\n', '\n')
+        .replaceAll(r'\n', '\n')
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n');
+  }
 
   factory Word.fromJson(Map<String, dynamic> json) {
     return Word(
@@ -35,11 +45,16 @@ class Word {
   List<String> get translationLines {
     if (translation.isEmpty) return [];
     // where 相当于 JS中filter
-    return translation
+    return _normalizeNewlines(translation)
         .split('\n')
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
         .toList();
+  }
+
+  // 单行释义，用于列表展示预览
+  String get displayTranslation {
+    return translationLines.join(' ');
   }
 
   // 将 'zk gk 4 6 ky' 映射为中文标签

@@ -200,7 +200,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    item.translation.replaceAll('\n', ' '),
+                                    item.displayTranslation,
                                     // 最大显示行数 配合overflow
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
