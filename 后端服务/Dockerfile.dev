@@ -1,0 +1,5 @@
+# 开发环境不需要两阶段构建 因为要保留完整 Go 工具链
+FROM golang:1.26-alpine
+# 构建时一次性执行 否则写到docker-compose.yml每次启动服务都要安装air
+RUN go install github.com/air-verse/air@latest
+WORKDIR /app

@@ -2,7 +2,7 @@
 name: translator-service
 services:
   meilisearch:
-    image: getmeili/meilisearch:v1.12
+    image: getmeili/meilisearch:v1.12 # 直接拉现成镜像，跳过构建
     container_name: meilisearch-service
     ports:
       - "7700:7700"
@@ -15,6 +15,24 @@ services:
     # 使用卷
     volumes:
       - meili_data:/meili_data
+  app:
+    # 自动调用docker build
+    build:
+      context: . # 表示当前目录作为构建镜像的上下文
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+    ports:
+      - "8080:8080"
+    # environment 会注册到运行环境中 通过os.Getenv获取
+    environment:
+      # local这些地址在docker内只能访问到容器自己(网络回环) 执行 docker compose up 时
+      # Docker 会自动组建局域网 并内置DNS域名解析 因此当app发起对meilisearch:7700的请求时
+      # 会把域名 meilisearch 动态解析成它的容器内网 IP（172.20.0.2）
+      MEILI_URL: http://meilisearch:7700
+    depends_on:
+      - meilisearch # 让meilisearch先启动
+    command: air # 容器启动后启动air监听
 # 创建卷
 volumes:
   meili_data:
