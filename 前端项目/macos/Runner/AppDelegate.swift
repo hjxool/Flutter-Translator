@@ -1,4 +1,5 @@
 import FlutterMacOS
+import MenuBarExtraAccess
 import SwiftUI
 
 // 程序的主入口标记
@@ -9,6 +10,9 @@ struct TranslatorApp: App {
   // 参数 表示告诉转接器：“请用哪一个类来做这个管家？”这里的 AppDelegate.self 就是class AppDelegate 传给它
   // 创建出来的管家实例存放到 appDelegate 类名后面跟：.self相当于 Java 的 .class
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+  // 状态栏小气泡窗口的展开/关闭状态（双向绑定）
+  @State private var isMenuPresented: Bool = false
 
   // 因为遵循的是 App 协议 所以是Scene而不是View
   // Scene 是“应用级常驻结构”，不是“一次性弹窗” var body: some Scene 并不是用来控制“启动瞬间”的临时逻辑，而是声明当前应用程序包含哪些长期存在的系统级入口
@@ -26,8 +30,9 @@ struct TranslatorApp: App {
     // 声明状态栏图标
     MenuBarExtra("Translator", systemImage: "character.book.closed") {
       // 点击图标后触发的该闭包
-      PopoverView()
+      PopoverView(isMenuPresented: $isMenuPresented)
     }
+    .menuBarExtraAccess(isPresented: $isMenuPresented)  // 必须紧邻 MenuBarExtra，声明式控制展开/收起
     .menuBarExtraStyle(.window)  // 气泡浮窗样式
   }
 }
