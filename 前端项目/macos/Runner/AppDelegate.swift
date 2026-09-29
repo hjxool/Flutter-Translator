@@ -11,6 +11,7 @@ struct TranslatorApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
   // 因为遵循的是 App 协议 所以是Scene而不是View
+  // Scene 是“应用级常驻结构”，不是“一次性弹窗” var body: some Scene 并不是用来控制“启动瞬间”的临时逻辑，而是声明当前应用程序包含哪些长期存在的系统级入口
   var body: some Scene {
     // 独立主窗口用于承载Flutter大界面（作为第一个Scene，启动时默认弹出）
     // SwiftUI 的生命周期机制里，声明顺序至关重要
@@ -22,7 +23,9 @@ struct TranslatorApp: App {
     }
 
     // 纯 SwiftUI 的状态栏小气泡窗口
+    // 声明状态栏图标
     MenuBarExtra("Translator", systemImage: "character.book.closed") {
+      // 点击图标后触发的该闭包
       PopoverView()
     }
     .menuBarExtraStyle(.window)  // 气泡浮窗样式

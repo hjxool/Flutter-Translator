@@ -1,15 +1,19 @@
-import SwiftUI
 import FlutterMacOS
+import SwiftUI
 
-// SwiftUI 无法直接识别 Flutter 的 FlutterViewController
-// 因此需要一个文件遵循 NSViewControllerRepresentable 协议，把 Flutter 控制器包装成 SwiftUI 能用的 View
-struct FlutterContentView:NSViewControllerRepresentable {
-    func makeNSViewController(context:Context) -> FlutterViewController {
-        let controller = FlutterViewController()
-        // 注册 Flutter 插件（如网络、音视频等插件）
-        RegisterGeneratedPlugins(registry: controller)
-        return controller
-    }
-    
-    func updateNSViewController(_ nsViewController: FlutterViewController, context: Context) {}
+// Flutter 引擎本身是基于 AppKit 构建 而SwiftUI包含 AppKit 的核心
+// 因此具有NSViewControllerRepresentable协议
+struct FlutterContentView: NSViewControllerRepresentable {
+  // FlutterViewController 由 FlutterMacOS 提供 内部封装了 Flutter 引擎实例
+  func makeNSViewController(context: Context) -> FlutterViewController {
+    // 创造实体
+    let controller = FlutterViewController()
+    // 给实体打补丁/安装插件
+    // RegisterGeneratedPlugins 由 FlutterMacOS 提供 将pubspec.yaml内需要调用 macOS 的插件配置到控制器上
+    RegisterGeneratedPlugins(registry: controller)
+    // 将这个配置完毕的完整实体交还给 SwiftUI
+    return controller
+  }
+
+  func updateNSViewController(_ nsViewController: FlutterViewController, context: Context) {}
 }
