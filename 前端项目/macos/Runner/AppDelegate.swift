@@ -45,23 +45,6 @@ class AppDelegate: FlutterAppDelegate {
         super.applicationDidFinishLaunching(notification)
         // 强制将应用策略设为常规应用（保证可以被 activate 到最前台）
         NSApp.setActivationPolicy(.regular)
-        
-        // 类似 Flutter 的 WidgetsBinding.instance.addPostFrameCallback
-        // 稍微延迟 100~200ms，确保 SwiftUI 的 Window 实例已创建并加入 NSApp.windows
-        // DispatchQueue.main: 指定在系统的“主线程”执行 .async 异步排队把花括号内的代码塞进主线程事件循环队尾
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            // 确保应用启动时激活到前台，避免窗口位于其他应用背后
-            NSApp.activate(ignoringOtherApps: true)
-            // NSApp.windows: 当前 App 创建的全部窗口
-            // where 是条件过滤 相当于省去了for循环里的if过滤
-            for w in NSApp.windows where w.canBecomeMain {
-                // makeKey: 让该窗口获得键盘焦点
-                // orderFront: 窗口移到最上层显示
-                // nil 表示不需要指定事件发送者
-                w.makeKeyAndOrderFront(nil)
-                break
-            }
-        }
     }
     
     // 从 macOS 12 / iOS 15 开始，如果应用没有显式实现此方法，系统控制台或编译运行期就会打印一条告警（Warning），提示开发者未明确声明安全状态恢复策略
