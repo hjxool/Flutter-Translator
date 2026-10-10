@@ -1,14 +1,65 @@
 // 引入苹果声明式 UI 开发框架（类似前端的 React 或 Flutter）
 import SwiftUI
 
+// 给系统的 String 扩展两个极简方法
+extension String {
+    func trim() -> String {
+        return self.trimmingCharacters(in: .whitespaces)
+    }
+    func replace(_ of:String, _ with:String) -> String {
+        return self.replacingOccurrences(of: of, with: with)
+    }
+}
+
+// 通用响应包装结构，对应后端的 {"head":{...},"body":T} 格式
+// T: Decodable 表示泛型约束，T 必须是可解码的类型
+// JSONDecoder 解码时会自动忽略结构体中未声明的字段（如 head），只取 body
+struct ApiResponse<T: Decodable>: Decodable {
+    let body: T
+}
+
+// 对应后端返回的单词结构
+// Decodable：表示能自动把后端发过来的 JSON 格式数据转成这个结构
+// Identifiable：给列表组件使用，表明每个单词都有独一无二的编号（id），方便界面渲染
+struct WordItem: Decodable, Identifiable {
+    let id: Int
+    let word: String
+    let phonetic: String
+    let translation: String
+    let tag: String
+    let exchange: String
+
+    // 计算属性
+    var displayTranslation: String {
+        get {
+            return translation
+                // 替换字符
+                .replace("\\r\\n", "\n")
+                .replace("\\n", "\n")
+                // 分割字符串
+                .components(separatedBy: "\n")
+                // 找到第一行不为空的有效内容
+                .first(where: { (item: String) -> Bool in
+                    return !item.trim().isEmpty
+                })
+                ?? ""
+        }
+    }
+}
+
 // SwiftUI 中，每一个界面组件都是一个遵循 View 协议的 struct
 // struct A: B 其中B必须是协议，因为 struct 永远不能继承任何类，也不能被继承 含义是遵循/实现了协议 B
 struct PopoverView: View {
   // @State：响应式状态定义 加了它就可以用 $属性 来双向绑定
   // 类似 React 的 useState，一旦这些变量值改变，界面上引用它们的部分会自动重新渲染
   @State private var searchText: String = ""
-  @State private var translationResult: String = "输入单词即可快速预览释义..."
-  @State private var isSearching: Bool = false
+  // key: [Type] 是类型标注 [Type] 表示存放Type类型的数组 = [] 赋初值
+  @State private var searchResults: [WordItem] = [] // 搜索结果列表
+  @State private var selectedWord: WordItem? = nil // 当前选中的单词详情
+  @State private var isSearching: Bool = false // 是否正在搜索中
+  // Task<Success, Failure> 表示执行成功返回 以及执行失败返回
+  // Never 表示绝不会报错崩溃而结束
+  @State private var debounceTask: Task<Void, Never>? = nil // 防抖任务句柄
 
   // @Binding：双向绑定状态，由外部（App/Scene 级）传入，用于控制当前状态栏弹窗的展开与关闭
   // @State 负责分配和管理真实内存 @Binding 自身只持有一对读写操作管道
@@ -26,7 +77,7 @@ struct PopoverView: View {
   @Environment(\.openWindow) private var openWindow
 
   // protocol View 中 associatedtype Body: View 其中associatedtype是泛型关键字 Body是声明的类型
-  // : View表示Body遵循View协议 本质表达的是“一个东西内部包含的组件，在行为和规范上与它自己属于同一类抽象”
+  // : View表示Body遵循View协议 本质表达的是"一个东西内部包含的组件，在行为和规范上与它自己属于同一类抽象"
   // 之所以是body: some View而不是body: Body 是为了用some View屏蔽复杂的Body类型实现
   // some 是修饰关键字 表示不透明类型 some + View 表示实现了 View 协议的某种具体静态类型
   // View 单独拿出来是协议（Protocol）Swift 中，不能把带关联类型的协议直接当作普通类型来用
@@ -44,9 +95,24 @@ struct PopoverView: View {
         TextField("输入要查询的内容...", text: $searchText)
           .textFieldStyle(.plain)  // 去掉默认边框
           .font(.system(size: 14))  // font接收的是Font结构体实例 system 表示字体来源
-          .onSubmit {
-            // 监听回车按键
-            performSearch()
+          // 已经能根据of: searchText推断类型 闭包内形参就不用写类型
+          // 参数列表不写类型 就可以省略括号
+          .onChange(of: searchText) { _, newVal in
+            debounceTask?.cancel()
+            // 检查输入内容
+            guard !newVal.trim().isEmpty else {
+              searchResults = []
+              selectedWord = nil
+              return
+            }
+            debounceTask = Task {
+              // try? 表示中途被取消了也不报错，安静退出
+              try? await Task.sleep(for: .milliseconds(300))
+              // 再次检查任务有没有被cancel
+              // 如果已经被取消了，直接 return，不发起搜索
+              guard !Task.isCancelled else { return }
+              await performSearch(newVal)
+            }
           }
         // 如果输入框不为空，显示一个快捷清空按钮
         if !searchText.isEmpty {
@@ -66,15 +132,55 @@ struct PopoverView: View {
           if isSearching {
             // 如果在加载中，显示系统转圈加载指示器 (Spinner)
             ProgressView("查询中...")
-              .frame(maxWidth: .infinity, alignment: .center)  // // 宽度撑满并居中
+              .frame(maxWidth: .infinity, alignment: .center)  // 宽度撑满并居中
+              .padding(.top, 20)
+          } else if searchResults.isEmpty && searchText.isEmpty {
+            Text("输入单词即可快速预览释义...")
+              .font(.system(size: 13))
+              .foregroundColor(.secondary)
+              .frame(maxWidth: .infinity, alignment: .center)
+              .padding(4)
+          } else if searchResults.isEmpty {
+            Text("暂无匹配单词")
+              .font(.system(size: 13))
+              .foregroundColor(.secondary)
+              .frame(maxWidth: .infinity, alignment: .center)
               .padding(.top, 20)
           } else {
-            // 正常状态显示翻译结果
-            Text(translationResult)
-              .font(.system(size: 13))
-              .lineSpacing(4)  // 行间距
-              .foregroundStyle(.primary)
-              .frame(maxWidth: .infinity, alignment: .leading)
+            // 有结果时展示列表
+            // 因为WordItem声明为Identifiable协议 因此ForEach省略了id:参数
+            // 否则需要以 id: \TypeName.propertyName 或 id: \.propertyName 传参
+            ForEach(searchResults) { item in
+              HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "doc.text")
+                  .font(.system(size: 11))
+                  .foregroundStyle(.secondary)
+                  .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(item.word)
+                    .font(.system(size: 13, weight: .medium))
+                  Text(item.displayTranslation)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1) // 最多显示的行数
+                }
+                // 将HStack撑开 配合高亮使用
+                Spacer()
+              }
+              .padding(.horizontal, 8)
+              .padding(.vertical, 6)
+              // 高亮
+              .background(
+                selectedWord?.id == item.id
+                  ? Color.accentColor.opacity(0.15)
+                  : Color.clear
+              )
+              .clipShape(RoundedRectangle(cornerRadius: 6)) // 圆角
+              .contentShape(Rectangle()) // 将整个矩形区域包括空白部分定义为可点击
+              .onTapGesture {
+                selectedWord = item
+              }
+            }
           }
         }
         .padding(4)
@@ -114,19 +220,36 @@ struct PopoverView: View {
   }
 
   // 业务逻辑函数
-  private func performSearch() {
-    // 去除首尾空格后如果为空，则直接退出不请求
-    // trimmingCharacters string结构体自带的方法 whitespaces 表示空格
-    guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-    // 进入加载状态，界面立刻切为 ProgressView 转圈
-    isSearching = true
-    Task {
-      // 挂起当前任务 0.6 秒（非阻塞等待）
-      // try 是简写do catch try? 表示不在乎错误是什么 报错则返回nil 正常则返回原本值
-      try? await Task.sleep(for: .seconds(0.6))
-      // 模板字符串 \(表达式)
-      self.translationResult = "【原生释义】\(self.searchText)\n1. n. 原生渲染示例；\n2. v. 脱离 Flutter 独立在平台渲染。"
-      self.isSearching = false  // 关闭加载转圈
+  private func performSearch(_ keyword: String) async {
+    // MainActor.run 表示"切换到主线程（专门负责更新界面UI的地方）"
+    await MainActor.run { isSearching = true }
+
+    // URLComponents 负责拼接 URL，queryItems 赋值时自动做 percent encoding，无需手动处理
+    var components = URLComponents()
+    components.scheme = "http"
+    components.host = "127.0.0.1"
+    components.port = 8080
+    components.path = "/api/search"
+    components.queryItems = [URLQueryItem(name: "keyword", value: keyword)]
+
+    guard let url = components.url else { return }
+
+    do {
+      // URLSession 管理网络请求 shared 是默认配置单例 data 获取服务器返回的二进制数据Data
+      // 返回值 二进制结果 和 网络响应(http状态码、响应头这些)
+      let (data, _) = try await URLSession.shared.data(from: url)
+      // ApiResponse 直接解码整个响应结构，JSONDecoder 会自动忽略 head 字段，只取 body
+      // JSONDecoder 解码器将二进制json数据反序列化为模型对象
+      // ApiResponse<[WordItem]> 是类型名称 decode 要求传入的是类型实例 因此Type.self获取类型的运行时实例（值）
+      let response = try JSONDecoder().decode(ApiResponse<[WordItem]>.self, from: data)
+      await MainActor.run {
+        searchResults = response.body
+        // 如果只有一条结果，自动选中，省去用户手动点击
+        if response.body.count == 1 { selectedWord = response.body.first }
+        isSearching = false
+      }
+    } catch {
+      await MainActor.run { isSearching = false }
     }
   }
 }
