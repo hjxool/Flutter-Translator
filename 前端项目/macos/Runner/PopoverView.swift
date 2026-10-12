@@ -1,50 +1,12 @@
 // 引入苹果声明式 UI 开发框架（类似前端的 React 或 Flutter）
 import SwiftUI
 
-// 给系统的 String 扩展两个极简方法
-extension String {
-    func trim() -> String {
-        return self.trimmingCharacters(in: .whitespaces)
-    }
-    func replace(_ of:String, _ with:String) -> String {
-        return self.replacingOccurrences(of: of, with: with)
-    }
-}
-
-// 通用响应包装结构，对应后端的 {"head":{...},"body":T} 格式
-// T: Decodable 表示泛型约束，T 必须是可解码的类型
-// JSONDecoder 解码时会自动忽略结构体中未声明的字段（如 head），只取 body
-struct ApiResponse<T: Decodable>: Decodable {
-    let body: T
-}
-
-// 对应后端返回的单词结构
-// Decodable：表示能自动把后端发过来的 JSON 格式数据转成这个结构
-// Identifiable：给列表组件使用，表明每个单词都有独一无二的编号（id），方便界面渲染
-struct WordItem: Decodable, Identifiable {
-    let id: Int
-    let word: String
-    let phonetic: String
-    let translation: String
-    let tag: String
-    let exchange: String
-
-    // 计算属性
-    var displayTranslation: String {
-        get {
-            return translation
-                // 替换字符
-                .replace("\\r\\n", "\n")
-                .replace("\\n", "\n")
-                // 分割字符串
-                .components(separatedBy: "\n")
-                // 找到第一行不为空的有效内容
-                .first(where: { (item: String) -> Bool in
-                    return !item.trim().isEmpty
-                })
-                ?? ""
-        }
-    }
+// 动态测量内部视图实际高度的 PreferenceKey
+struct ContentHeightPreferenceKey: PreferenceKey {
+  static var defaultValue: CGFloat = 0
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = max(value, nextValue())
+  }
 }
 
 // SwiftUI 中，每一个界面组件都是一个遵循 View 协议的 struct
@@ -54,12 +16,17 @@ struct PopoverView: View {
   // 类似 React 的 useState，一旦这些变量值改变，界面上引用它们的部分会自动重新渲染
   @State private var searchText: String = ""
   // key: [Type] 是类型标注 [Type] 表示存放Type类型的数组 = [] 赋初值
-  @State private var searchResults: [WordItem] = [] // 搜索结果列表
-  @State private var selectedWord: WordItem? = nil // 当前选中的单词详情
-  @State private var isSearching: Bool = false // 是否正在搜索中
+  @State private var searchResults: [WordItem] = []  // 搜索结果列表
+  @State private var selectedWord: WordItem? = nil  // 当前选中的单词详情（为 nil 时展示列表，不为 nil 时原地展示详情）
+  @State private var isSearching: Bool = false  // 是否正在搜索中
   // Task<Success, Failure> 表示执行成功返回 以及执行失败返回
   // Never 表示绝不会报错崩溃而结束
-  @State private var debounceTask: Task<Void, Never>? = nil // 防抖任务句柄
+  @State private var debounceTask: Task<Void, Never>? = nil  // 防抖任务句柄
+
+  // 动态测量内部内容高度，实现自适应展开
+  @State private var dynamicContentHeight: CGFloat = 60
+  // 最大滚动高度限制（超过此高度才开启滚动）
+  private let maxScrollHeight: CGFloat = 400
 
   // @Binding：双向绑定状态，由外部（App/Scene 级）传入，用于控制当前状态栏弹窗的展开与关闭
   // @State 负责分配和管理真实内存 @Binding 自身只持有一对读写操作管道
@@ -83,14 +50,32 @@ struct PopoverView: View {
   // View 单独拿出来是协议（Protocol）Swift 中，不能把带关联类型的协议直接当作普通类型来用
   // 界面主体 (body) 所有 SwiftUI 界面的布局都在 body 属性中描述
   var body: some View {
-    // VStack = 垂直线性布局（从上往下排布），内部子元素间距 12pt
+    // VStack = 垂直线性布局（从上往下排布），内部子元素间距 10pt
     // swift 中规定函数的最后一个参数是回调函数时 可以把{}写在()外部
-    // 完整写法其实是 VStack.init(spacing:12, content: {闭包})
+    // 完整写法其实是 VStack.init(spacing:10, content: {闭包})
     // init 是构造函数 但可以省略
-    VStack(spacing: 12) {
-      // 顶部：搜索栏
-      HStack {
-        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+    VStack(spacing: 10) {
+      // 顶部：搜索栏（支持返回按钮与清除按钮）
+      HStack(spacing: 8) {
+        // 如果当前正处于单词详情模式，左侧显示返回列表按钮
+        if selectedWord != nil {
+          Button(action: {
+            // action接收回调函数 withAnimation是显式动画函数 让“数据变化”所引发的所有界面变动以平滑过渡的方式呈现
+            withAnimation(.easeInOut(duration: 0.2)) {
+              selectedWord = nil
+            }
+          }) {
+            Image(systemName: "chevron.left")
+              .font(.system(size: 13, weight: .semibold))
+              .foregroundStyle(.secondary)
+          }
+          .buttonStyle(.plain)
+          .help("返回搜索结果")
+        } else {
+          Image(systemName: "magnifyingglass")
+            .foregroundStyle(.secondary)
+        }
+
         // text 参数用于实现双向数据绑定
         TextField("输入要查询的内容...", text: $searchText)
           .textFieldStyle(.plain)  // 去掉默认边框
@@ -98,11 +83,15 @@ struct PopoverView: View {
           // 已经能根据of: searchText推断类型 闭包内形参就不用写类型
           // 参数列表不写类型 就可以省略括号
           .onChange(of: searchText) { _, newVal in
+            // 用户输入发生变化时，退出详情页，切回搜索列表
+            if selectedWord != nil {
+              selectedWord = nil
+            }
+
             debounceTask?.cancel()
             // 检查输入内容
             guard !newVal.trim().isEmpty else {
               searchResults = []
-              selectedWord = nil
               return
             }
             debounceTask = Task {
@@ -114,38 +103,48 @@ struct PopoverView: View {
               await performSearch(newVal)
             }
           }
+
         // 如果输入框不为空，显示一个快捷清空按钮
         if !searchText.isEmpty {
-          Button(action: { searchText = "" }) {
+          Button(action: {
             // 因为是最后一个参数 且 也是传入回调函数所以写到外面
-            Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-          }.buttonStyle(.plain)
+            searchText = ""
+            selectedWord = nil
+            searchResults = []
+          }) {
+            Image(systemName: "xmark.circle.fill")
+              .foregroundStyle(.secondary)
+          }
+          .buttonStyle(.plain)
         }
       }
       .padding(8)  // 因为实现了ExpressibleByIntegerLiteral协议 所以可以直接传数字 而Font没有
       .background(Color(NSColor.controlBackgroundColor))
       .cornerRadius(8)
 
-      // 中部：释义展示卡片
-      ScrollView {
+      // 中部：动态内容区（详情视图 ⇄ 搜索结果列表，自适应高度 + 设限滚动）
+      ScrollView(.vertical, showsIndicators: true) {
         VStack(alignment: .leading, spacing: 8) {
           if isSearching {
             // 如果在加载中，显示系统转圈加载指示器 (Spinner)
             ProgressView("查询中...")
               .frame(maxWidth: .infinity, alignment: .center)  // 宽度撑满并居中
-              .padding(.top, 20)
+              .padding(.vertical, 16)
+          } else if let word = selectedWord {
+            // 【核心切换】：点击单词后原地展示单词详情（复用外部模块组件）
+            WordDetailContentView(item: word)
           } else if searchResults.isEmpty && searchText.isEmpty {
             Text("输入单词即可快速预览释义...")
               .font(.system(size: 13))
               .foregroundColor(.secondary)
               .frame(maxWidth: .infinity, alignment: .center)
-              .padding(4)
+              .padding(.vertical, 12)
           } else if searchResults.isEmpty {
             Text("暂无匹配单词")
               .font(.system(size: 13))
               .foregroundColor(.secondary)
               .frame(maxWidth: .infinity, alignment: .center)
-              .padding(.top, 20)
+              .padding(.vertical, 16)
           } else {
             // 有结果时展示列表
             // 因为WordItem声明为Identifiable协议 因此ForEach省略了id:参数
@@ -162,30 +161,42 @@ struct PopoverView: View {
                   Text(item.displayTranslation)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1) // 最多显示的行数
+                    .lineLimit(1)  // 最多显示的行数
                 }
                 // 将HStack撑开 配合高亮使用
                 Spacer()
               }
               .padding(.horizontal, 8)
               .padding(.vertical, 6)
-              // 高亮
-              .background(
-                selectedWord?.id == item.id
-                  ? Color.accentColor.opacity(0.15)
-                  : Color.clear
-              )
-              .clipShape(RoundedRectangle(cornerRadius: 6)) // 圆角
-              .contentShape(Rectangle()) // 将整个矩形区域包括空白部分定义为可点击
+              .clipShape(RoundedRectangle(cornerRadius: 6))  // 圆角
+              .contentShape(Rectangle())  // 将整个矩形区域包括空白部分定义为可点击
               .onTapGesture {
-                selectedWord = item
+                // 点击单词条目，原地平滑切换为详情视图
+                withAnimation(.easeInOut(duration: 0.2)) {
+                  selectedWord = item
+                }
               }
             }
           }
         }
         .padding(4)
+        // 测量内部实际渲染高度
+        .background(
+          GeometryReader { geo in
+            Color.clear.preference(
+              key: ContentHeightPreferenceKey.self,
+              value: geo.size.height
+            )
+          }
+        )
       }
-      .frame(maxHeight: .infinity)  // 撑满剩余垂直高度
+      .onPreferenceChange(ContentHeightPreferenceKey.self) { newHeight in
+        if abs(dynamicContentHeight - newHeight) > 1 {
+          dynamicContentHeight = newHeight
+        }
+      }
+      // 核心自适应逻辑：内容高度较小时刚好包裹内容，超出 maxScrollHeight 时固定高度并开启滚动
+      .frame(height: min(max(dynamicContentHeight, 40), maxScrollHeight))
 
       Divider()  // 分割线
 
@@ -215,7 +226,10 @@ struct PopoverView: View {
     }
     // 整窗修饰符
     .padding(14)
-    .frame(width: 320, height: 400)
+    // 宽度固定为 320，不再硬编码 height: 400，实现窗口完全自适应内容
+    .frame(width: 320)
+    .animation(.easeInOut(duration: 0.2), value: dynamicContentHeight)
+    .animation(.easeInOut(duration: 0.2), value: selectedWord?.id)
     .background(.ultraThinMaterial)  // macOS 原生的超薄毛玻璃（实时模糊穿透桌面背景）
   }
 
@@ -244,8 +258,6 @@ struct PopoverView: View {
       let response = try JSONDecoder().decode(ApiResponse<[WordItem]>.self, from: data)
       await MainActor.run {
         searchResults = response.body
-        // 如果只有一条结果，自动选中，省去用户手动点击
-        if response.body.count == 1 { selectedWord = response.body.first }
         isSearching = false
       }
     } catch {
