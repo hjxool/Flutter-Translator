@@ -208,19 +208,18 @@ struct PopoverView: View {
         Spacer()  // 弹性占位空间（弹簧），把左右两侧的内容推到最左和最右
         // 按钮：直接打开 id 为 "main-window" 的 Flutter 大窗口，并同时关闭当前状态栏弹窗
         Button(action: {
-          // 1. 同步当前浮窗中正在查询或查看的单词到主界面
+          // 1. 同步当前浮窗中正在查询或查看的单词到主界面（支持有词同步及空状态彻底清空）
           let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)  // 输入框文本
           // 浮窗是否点击具体单词 如果没选则退而求其次使用输入框文本
           let keywordToSync = selectedWord?.word ?? trimmedSearch
-          let wordToSelect = selectedWord?.word
+          // 没有选中词时为nil 置为空字符串
+          let wordToSelect = selectedWord?.word ?? ""
 
-          if !keywordToSync.isEmpty {
-            // 输入框有内容就同步
-            FlutterBridge.shared.syncSearch(
-              keyword: keywordToSync,
-              selectedWord: wordToSelect
-            )
-          }
+          // 无论是否为空均触发同步（空值代表清空主窗口搜索与详情）
+          FlutterBridge.shared.syncSearch(
+            keyword: keywordToSync,
+            selectedWord: wordToSelect
+          )
 
           // 2. 打开独立主窗口
           openWindow(id: "main-window")

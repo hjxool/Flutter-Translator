@@ -69,24 +69,31 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   void _applySync({String? keyword, String? selectedWord}) {
-    if (!mounted || keyword == null || keyword.isEmpty) return;
+    if (!mounted) return;
 
     // 取消可能正在进行的输入框防抖
     _debounceTimer?.cancel();
 
+    final targetKeyword = keyword ?? '';
+    final targetSelectedWord = selectedWord ?? '';
+
     // 更新输入框内容并把光标移至末尾
-    _searchController.text = keyword;
+    _searchController.text = targetKeyword;
     _searchController.selection = TextSelection.collapsed(
-      offset: keyword.length,
+      offset: targetKeyword.length,
     );
 
-    // 更新 Riverpod 状态，触发搜索结果列表加载
-    ref.read(searchProvider.notifier).setKeyword(keyword);
-
-    // 如果指定了具体查看的单词，触发该单词详情加载
-    if (selectedWord != null && selectedWord.isNotEmpty) {
-      ref.read(searchProvider.notifier).selectWord(selectedWord);
+    // 如果两者均为空，代表彻底清空搜索与详情
+    if (targetKeyword.isEmpty && targetSelectedWord.isEmpty) {
+      ref.read(searchProvider.notifier).clear();
+      return;
     }
+
+    // 更新 Riverpod 状态：设置关键字（自动触发搜索结果列表加载）
+    ref.read(searchProvider.notifier).setKeyword(targetKeyword);
+
+    // 同步选中的单词：如果为空字符串，则取消选中并清空右侧详情
+    ref.read(searchProvider.notifier).selectWord(targetSelectedWord);
   }
 
   @override
@@ -101,7 +108,18 @@ class _HomePageState extends ConsumerState<HomePage> {
   void _onSearchChanged(String value) {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-      ref.read(searchProvider.notifier).setKeyword(value);
+      final trimmed = value.trim();
+      // 常见ref.read(xxxProvider.notifier)获取控制器 但这里是为了获取state本身
+      final currentSelected = ref.read(searchProvider).selectedWord;
+      // 当输入框被清空，或输入的新内容与当前选中的词不匹配时，联动重置右侧详情
+      final shouldResetSelection =
+          trimmed.isEmpty ||
+          (currentSelected.isNotEmpty &&
+              currentSelected.toLowerCase() != trimmed.toLowerCase());
+
+      ref
+          .read(searchProvider.notifier)
+          .setKeyword(value, resetSelection: shouldResetSelection);
     });
   }
 
@@ -311,10 +329,29 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         data: (data) {
           if (data == null) {
+            final currentWord = ref.watch(
+              searchProvider.select((state) => state.selectedWord),
+            ); // 选中词
+            final currentKeyword = ref.watch(
+              searchProvider.select((state) => state.keyword),
+            ); // 输入框文本
+
+            final String tip;
+            if (currentWord.isNotEmpty) {
+              // 查询结果为空 且 选中词不为空
+              tip = '未找到 "$currentWord" 的详细释义';
+            } else if (currentKeyword.trim().isNotEmpty) {
+              // 输入框文本不为空
+              tip = '请在左侧列表选择单词查看释义';
+            } else {
+              // 均为空
+              tip = '输入单词开始查询';
+            }
+
             return Center(
               child: Text(
-                '未找到单词详情',
-                style: TextStyle(color: colorScheme.outline),
+                tip,
+                style: TextStyle(color: colorScheme.outline, fontSize: 13),
               ),
             );
           }

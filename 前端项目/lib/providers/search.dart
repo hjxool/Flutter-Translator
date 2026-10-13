@@ -26,19 +26,24 @@ class SearchNotifier extends Notifier<SearchState> {
   @override
   SearchState build() => const SearchState();
 
-  // 更新搜索关键字
-  void setKeyword(String newKeyword) {
-    state = state.copyWith(keyword: newKeyword);
+  // 更新搜索关键字，支持可选重置选中的单词
+  void setKeyword(String newKeyword, {bool resetSelection = false}) {
+    // copyWith无法置空 改为手动创建新的
+    state = SearchState(
+      keyword: newKeyword,
+      selectedWord: resetSelection ? '' : state.selectedWord,
+    );
   }
 
-  // 选中列表中的某个单词
+  // 选中列表中的某个单词（传空字符串即可取消选中并清除右侧详情）
   void selectWord(String word) {
     state = state.copyWith(selectedWord: word);
   }
 
-  // 清空搜索框
+  // 彻底清空搜索状态（同时清空搜索词和选中的详情）
   void clear() {
-    state = state.copyWith(keyword: '');
+    // copyWith无法置空
+    state = const SearchState();
   }
 }
 
