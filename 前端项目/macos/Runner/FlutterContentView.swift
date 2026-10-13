@@ -32,6 +32,8 @@ struct FlutterContentView: NSViewControllerRepresentable {
     // 给实体打补丁/安装插件
     // RegisterGeneratedPlugins 由 FlutterMacOS 提供 将pubspec.yaml内需要调用 macOS 的插件配置到控制器上
     RegisterGeneratedPlugins(registry: controller)
+    // 接入原生与 Flutter 的 MethodChannel 桥接服务
+    FlutterBridge.shared.setup(with: controller.engine.binaryMessenger)
     // 将这个配置完毕的完整实体交还给 SwiftUI
     return controller
   }

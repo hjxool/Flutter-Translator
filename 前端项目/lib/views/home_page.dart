@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_translator/providers/search.dart';
 
@@ -12,6 +13,13 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
+  // 与 macOS 原生 FlutterBridge 对应的 MethodChannel
+  // MethodChannel：对标 HTTP / RPC。单次请求/调用
+  // EventChannel：对标 SSE
+  static const MethodChannel _bridgeChannel = MethodChannel(
+    'com.flutter_translator/search_bridge',
+  );
+
   late final TextEditingController _searchController;
   Timer? _debounceTimer;
 
@@ -22,10 +30,68 @@ class _HomePageState extends ConsumerState<HomePage> {
       // text 参数用来初始化输入框
       text: ref.read(searchProvider).keyword,
     );
+    _initNativeBridge();
+  }
+
+  void _initNativeBridge() {
+    // 1. 设置原生主动推送监听（应对主窗口已常驻在后台时的热同步场景）
+    // Dart侧：注册监听回调 channel.setMethodCallHandler((call) async { ... })
+    _bridgeChannel.setMethodCallHandler((call) async {
+      // .method .arguments 都是固定写法
+      if (call.method == 'syncSearch') {
+        // Map.from 适合动态类型数据 进行校验
+        // Map.of 适合编译期满足泛型约束
+        final args = Map<String, dynamic>.from(call.arguments as Map);
+        _applySync(
+          keyword: args['keyword'] as String?,
+          selectedWord: args['selectedWord'] as String?,
+        );
+      }
+    });
+
+    // 2. 首帧渲染完成后，主动向原生拉取一次可能遗留的未消费搜索词（应对冷启动场景）
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        // Dart侧：主动发起调用 channel.invokeMethod('method', args)
+        // res 就是从swift中(call, result) in ... result(数据)传回的数据
+        final res = await _bridgeChannel.invokeMethod<Map>('getPendingSearch');
+        if (res != null) {
+          final args = Map<String, dynamic>.from(res);
+          _applySync(
+            keyword: args['keyword'] as String?,
+            selectedWord: args['selectedWord'] as String?,
+          );
+        }
+      } catch (e) {
+        debugPrint('获取初始同步单词失败: $e');
+      }
+    });
+  }
+
+  void _applySync({String? keyword, String? selectedWord}) {
+    if (!mounted || keyword == null || keyword.isEmpty) return;
+
+    // 取消可能正在进行的输入框防抖
+    _debounceTimer?.cancel();
+
+    // 更新输入框内容并把光标移至末尾
+    _searchController.text = keyword;
+    _searchController.selection = TextSelection.collapsed(
+      offset: keyword.length,
+    );
+
+    // 更新 Riverpod 状态，触发搜索结果列表加载
+    ref.read(searchProvider.notifier).setKeyword(keyword);
+
+    // 如果指定了具体查看的单词，触发该单词详情加载
+    if (selectedWord != null && selectedWord.isNotEmpty) {
+      ref.read(searchProvider.notifier).selectWord(selectedWord);
+    }
   }
 
   @override
   void dispose() {
+    _bridgeChannel.setMethodCallHandler(null);
     _searchController.dispose();
     _debounceTimer?.cancel();
     super.dispose();
