@@ -4,6 +4,7 @@ import SwiftUI
 // 动态测量内部视图实际高度的 PreferenceKey
 struct ContentHeightPreferenceKey: PreferenceKey {
   static var defaultValue: CGFloat = 0
+  // 如果同一个视图树里有多个子视图都向这个频道发送了高度 把多个高度取最大值归纳为一个最终值
   static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
     value = max(value, nextValue())
   }
@@ -182,16 +183,25 @@ struct PopoverView: View {
         .padding(4)
         // 测量内部实际渲染高度
         .background(
+          // GeometryReader 获取父级容器分配的空间大小和坐标系
+          // GeometryReader 本身是贪婪的：如果直接把它写在页面里，它会试图霸占全屏
+          // 但 .background() 是克制的：任何视图的 .background(...) 修饰符，其尺寸必须严格被其宿主视图限定
+          // background 也要求传入view 因此选用Color.clear
           GeometryReader { geo in
+            // GeometryReader 的闭包内部必须返回一个具体的 View 因此用Color.clear当隐形探针
+            // clear 不仅透明而且由于background在底层 因此不会干扰点击
+            // preference 就是与 onPreferenceChange 配套使用的
             Color.clear.preference(
+              // 传递类型本身 作为value值的key swift用这种方式避免手动拼写key导致的错误
               key: ContentHeightPreferenceKey.self,
-              value: geo.size.height
+              value: geo.size.height  // 对应后面onPreferenceChange回调中的newHeight值
             )
           }
         )
       }
       .onPreferenceChange(ContentHeightPreferenceKey.self) { newHeight in
         if abs(dynamicContentHeight - newHeight) > 1 {
+          // 取更大值 更新动态高度变量
           dynamicContentHeight = newHeight
         }
       }

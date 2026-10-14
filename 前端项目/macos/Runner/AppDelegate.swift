@@ -28,13 +28,21 @@ struct TranslatorApp: App {
 
     // 纯 SwiftUI 的状态栏小气泡窗口
     // 声明状态栏图标
+    // MenuBarExtra只能跟左键点击关联 因此需要额外添加时间监听右键点击
     MenuBarExtra("Translator", systemImage: "character.book.closed") {
       // 点击图标后触发的该闭包
       PopoverView(isMenuPresented: $isMenuPresented)
     }
     // 必须紧邻 MenuBarExtra，声明式控制展开/收起
     // 之所以用MenuBarExtraAccess提供的方法是因为swiftUI没法手动控制浮窗关闭
-    .menuBarExtraAccess(isPresented: $isMenuPresented)
+    // MenuBarExtraAccess 传入的回调函数可以拿到 图标实例，添加右键菜单监听
+    .menuBarExtraAccess(isPresented: $isMenuPresented) { statusItem in
+      // 尾随闭包传入的是onRightClick
+      StatusBarMenuManager.shared.setup(statusItem: statusItem) {
+        // 当用户右键点击状态栏图标时，若左键气泡浮窗正在显示，自动平滑收起
+        isMenuPresented = false
+      }
+    }
     .menuBarExtraStyle(.window)  // 气泡浮窗样式
   }
 }

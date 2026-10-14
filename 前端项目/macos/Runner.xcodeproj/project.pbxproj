@@ -27,6 +27,7 @@
 		26A000043061245100490A77 /* WordItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26A000033061244000490A77 /* WordItem.swift */; };
 		26A000063061245100490A77 /* WordDetailContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26A000053061244000490A77 /* WordDetailContentView.swift */; };
 		26A000083061245100490A77 /* FlutterBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26A000073061244000490A77 /* FlutterBridge.swift */; };
+		26A0000A3061245100490A77 /* StatusBarMenuManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26A000093061244000490A77 /* StatusBarMenuManager.swift */; };
 		331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C80D7294CF71000263BE5 /* RunnerTests.swift */; };
 		335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */; };
 		33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC10F02044A3C60003C045 /* AppDelegate.swift */; };
@@ -74,6 +75,7 @@
 		26A000033061244000490A77 /* WordItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordItem.swift; sourceTree = "<group>"; };
 		26A000053061244000490A77 /* WordDetailContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WordDetailContentView.swift; sourceTree = "<group>"; };
 		26A000073061244000490A77 /* FlutterBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlutterBridge.swift; sourceTree = "<group>"; };
+		26A000093061244000490A77 /* StatusBarMenuManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarMenuManager.swift; sourceTree = "<group>"; };
 		331C80D5294CF71000263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		331C80D7294CF71000263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		333000ED22D3DE5D00554162 /* Warnings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Warnings.xcconfig; sourceTree = "<group>"; };
@@ -185,6 +187,7 @@
 				26A000033061244000490A77 /* WordItem.swift */,
 				26A000053061244000490A77 /* WordDetailContentView.swift */,
 				26A000073061244000490A77 /* FlutterBridge.swift */,
+				26A000093061244000490A77 /* StatusBarMenuManager.swift */,
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				2640454F3064FB9200B543EF /* FlutterContentView.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
@@ -383,6 +386,7 @@
 				26A000043061245100490A77 /* WordItem.swift in Sources */,
 				26A000063061245100490A77 /* WordDetailContentView.swift in Sources */,
 				26A000083061245100490A77 /* FlutterBridge.swift in Sources */,
+				26A0000A3061245100490A77 /* StatusBarMenuManager.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 				264045503064FB9800B543EF /* FlutterContentView.swift in Sources */,
 			);
