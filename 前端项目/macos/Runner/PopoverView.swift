@@ -29,20 +29,15 @@ struct PopoverView: View {
   // 最大滚动高度限制（超过此高度才开启滚动）
   private let maxScrollHeight: CGFloat = 400
 
+  // 浮窗关闭回调（由外部 AppKit 宿主传入，用于在点击打开主窗口等操作后平滑收起浮窗）
+  var onClose: (() -> Void)? = nil
+
+  // 【学习笔记保留】：
   // @Binding：双向绑定状态，由外部（App/Scene 级）传入，用于控制当前状态栏弹窗的展开与关闭
   // @State 负责分配和管理真实内存 @Binding 自身只持有一对读写操作管道
   // @State 和 @Binding大多数情况下就是成对搭配出现 @State 创建并拥有真实数据（分配内存、负责存储）@Binding 声明，接收外层传进来的绑定（不分配独立数据内存、负责委托修改）
-  @Binding var isMenuPresented: Bool
-
-  // 类似抽象方法 定义接口规格，推迟具体实现 外部使用PopoverView时必须提供回调实现
-  // var onOpenMainWindow: () -> Void
   // @Environment 借用系统API \.openWindow 是系统的KeyPath表示激活新窗口的能力
-  // SwiftUI 底层，有一个巨大的全局字典型容器存放了所有系统级的环境信息 openWindow 是该仓库中的工具
-  // EnvironmentValues.openWindow 取出来的并不是普通函数，而是struct
-  // openWindow(id) 实际上是执行 openWindow.callAsFunction(id)
-  // callAsFunction 是语法糖 在类型（struct、class 甚至 enum）中实现了 func callAsFunction(...)
-  // 该类型的具体实例就可以直接加上括号像函数一样被调用 类似TS、Dart中的fn.call call被简写了而已
-  @Environment(\.openWindow) private var openWindow
+  // EnvironmentValues.openWindow 取出来的并不是普通函数，而是struct，通过 callAsFunction 语法糖直接像函数一样调用
 
   // protocol View 中 associatedtype Body: View 其中associatedtype是泛型关键字 Body是声明的类型
   // : View表示Body遵循View协议 本质表达的是"一个东西内部包含的组件，在行为和规范上与它自己属于同一类抽象"
@@ -216,7 +211,7 @@ struct PopoverView: View {
           .font(.caption)  // 辅助说明性小字号
           .foregroundStyle(.secondary)
         Spacer()  // 弹性占位空间（弹簧），把左右两侧的内容推到最左和最右
-        // 按钮：直接打开 id 为 "main-window" 的 Flutter 大窗口，并同时关闭当前状态栏弹窗
+        // 按钮：直接通过 AppKit 打开 Flutter 主窗口，并同时关闭当前状态栏弹窗
         Button(action: {
           // 1. 同步当前浮窗中正在查询或查看的单词到主界面（支持有词同步及空状态彻底清空）
           let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)  // 输入框文本
@@ -231,12 +226,13 @@ struct PopoverView: View {
             selectedWord: wordToSelect
           )
 
-          // 2. 打开独立主窗口
-          openWindow(id: "main-window")
-          // 3. 激活应用到前台，避免窗口位于其他应用背后
-          NSApp.activate(ignoringOtherApps: true)
-          // 4. 将弹窗状态置为 false，平滑关闭状态栏小气泡浮窗
-          isMenuPresented = false
+          // 2. 打开并激活独立主窗口（通过 AppKit 的 AppDelegate 唤起）
+          // NSApp.delegate 自身没有showMainWindow自定义方法
+          // 因此需要as? AppDelegate类型转换告诉Swift 编译器它的身份其实是实现了NSApplicationDelegate的AppDelegate类并调用自定义方法
+          (NSApp.delegate as? AppDelegate)?.showMainWindow()
+
+          // 3. 将弹窗平滑关闭
+          onClose?()
         }) {
           HStack(spacing: 4) {
             Text("打开完整主窗口")

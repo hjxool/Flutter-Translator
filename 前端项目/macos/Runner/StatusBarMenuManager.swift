@@ -1,23 +1,28 @@
 import Cocoa
+import SwiftUI
 
-/// StatusBarMenuManager：专门负责顶部状态栏图标右键菜单的管理类
+/// StatusBarMenuManager：以 AppKit 为底管理系统状态栏图标与浮窗
 /// 实现功能：
-/// 1. 右键点击状态栏图标时，弹出原生系统菜单（不影响左键点击弹出查词浮窗）
-/// 2. 功能开关项（划词取词、鼠标悬停取词、快捷键截图翻译）以“勾选/取消勾选”状态呈现，并持久化到 UserDefaults
-/// 3. 分隔线隔开各业务开关
-/// 4. 底部放置“退出应用”选项（带 Cmd+Q 提示），彻底退出整个应用进程
+/// 1. 左键点击状态栏图标：展开/收起以 SwiftUI 填充的 PopoverView 查词浮窗
+/// 2. 右键点击状态栏图标：弹出原生系统菜单（不影响左键点击弹出查词浮窗）
+/// 3. 功能开关项（划词取词、鼠标悬停取词、快捷键截图翻译）以“勾选/取消勾选”状态呈现，并持久化到 UserDefaults
+/// 4. 分隔线隔开各业务开关
+/// 5. 底部放置“退出应用”选项（带 Cmd+Q 提示），彻底退出整个应用进程
 // 继承 NSObject 说明使用的是 macOS 传统的 AppKit 框架（命令式 UI）
-// 因为SwiftUI的 MenuBarExtra 存在严重的局限性 无法区分鼠标左右键
 class StatusBarMenuManager: NSObject {
   // 单例模式，确保全局唯一的状态栏菜单句柄
   static let shared = StatusBarMenuManager()
-  // weak 声明弱引用 表示不会增加被引用对象的引用计数 当被引用的对象被系统释放销毁时，该属性会被自动置为 nil
-  // 因此 weak 修饰的变量必须是 var 且必须是可选类型 ?
-  private weak var statusItem: NSStatusItem?
+
+  // AppKit 原生状态栏图标对象
+  private var statusItem: NSStatusItem?
+  // AppKit 原生气泡浮窗容器（内部填充 SwiftUI）
+  private var popover = NSPopover()
+  // NSHostingController 必须作为类属性强引用保留，否则 setup() 执行完后 ARC 会立即释放它
+  // 导致 popover.contentViewController 变成悬空引用，进而使状态栏图标不响应甚至消失
+  // 悬空引用：引用的内存被回收了 但指针本身没有被清指向一片虚无空间
+  private var popoverHostingController: NSHostingController<PopoverView>?
   // NSMenu 是 macOS 原生 AppKit 框架中的菜单容器对象 屏幕顶部的主菜单栏、Dock 图标弹出的右键菜单，还是状态栏托盘图标的下拉菜单，底层都是 NSMenu
   private var contextMenu = NSMenu()
-  private var eventMonitor: Any?
-  private var onRightClickTriggered: (() -> Void)?
 
   // MARK: - 持久化配置键名定义
   private enum PrefKeys {
@@ -46,29 +51,103 @@ class StatusBarMenuManager: NSObject {
     get { UserDefaults.standard.object(forKey: PrefKeys.enableOcr) as? Bool ?? true }
     set { UserDefaults.standard.set(newValue, forKey: PrefKeys.enableOcr) }
   }
+
   // 单例模式 隐藏起构造函数 由前面StatusBarMenuManager()调用
   private override init() {
     super.init()
   }
-  // 生命周期结束前执行资源清理，避免内存泄漏或无效回调
-  deinit {
-    if let monitor = eventMonitor {
-      NSEvent.removeMonitor(monitor)  // 移除监听器
+
+  // MARK: - 初始化绑定
+  /// 启动配置：以 AppKit 为底创建状态栏图标，配置 NSPopover（由 SwiftUI 填充）和右键菜单
+  func setup() {
+    // 1. 创建 AppKit 原生状态栏条目
+    // squareLength = 正方形宽度，适合只放图标；variableLength = 由内容自动决定宽度
+    let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    self.statusItem = item
+
+    print("[StatusBar] statusItem created: \(item)")
+    print("[StatusBar] button: \(String(describing: item.button))")
+
+    if let button = item.button {
+      let icon = NSImage(
+        systemSymbolName: "character.book.closed",
+        accessibilityDescription: "Translator"
+      )
+      print("[StatusBar] icon from systemSymbolName: \(String(describing: icon))")
+
+      if let icon = icon {
+        // 正常情况：用 SF Symbol 图标，设为 template 模式以适配 macOS 深色/浅色外观
+        icon.isTemplate = true
+        button.image = icon
+      } else {
+        // 兜底：SF Symbol 加载失败时，用文字代替确保图标可见
+        button.title = "译"
+      }
+
+      button.target = self
+      button.action = #selector(handleStatusItemClick(_:))
+      // 开启支持响应左键和右键抬起事件
+      button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+    } else {
+      print("[StatusBar] ⚠️ button is nil！状态栏条目创建失败")
+    }
+
+
+    // 2. 配置 AppKit 浮窗容器 (NSPopover)
+    popover.behavior = .transient  // 点击浮窗外部区域时系统自动平滑收起
+    popover.animates = true
+
+    // 【以 AppKit 为底，SwiftUI 填充】：使用 NSHostingController 将纯 SwiftUI 编写的 PopoverView 挂载入 AppKit 浮窗中
+    let hostingController = NSHostingController(
+      rootView: PopoverView(onClose: { [weak self] in
+        self?.closePopover()
+      })
+    )
+    // 必须强引用到类属性，防止 setup() 返回后 ARC 立即释放这个局部变量
+    // 若不保留，popover.contentViewController 会变成悬空引用
+    popoverHostingController = hostingController
+    // contentViewController 必须是 NSViewController，通过 NSHostingController 将其转换
+    // contentViewController 其特殊性导致赋值无法增加强引用ARC计数
+    popover.contentViewController = hostingController
+
+    // 3. 构建右键原生菜单
+    buildMenu()
+  }
+
+  // MARK: - 左右键点击分发
+  @objc private func handleStatusItemClick(_ sender: NSStatusBarButton) {
+    guard let event = NSApp.currentEvent else { return }
+
+    // 判断是否为右键或按住 Control 键的左键点击
+    let isRightClick = event.type == .rightMouseUp
+    let isControlLeftClick = event.type == .leftMouseUp && event.modifierFlags.contains(.control)
+
+    if isRightClick || isControlLeftClick {
+      // 如果左键浮窗正在展开，先平滑收起它
+      closePopover()
+      // 弹出右键菜单
+      showContextMenu(for: sender)
+    } else {
+      // 普通左键点击：切换 SwiftUI 浮窗显示/收起
+      togglePopover(sender)
     }
   }
 
-  // MARK: - 初始化绑定
-  /// 绑定系统状态栏项目，并配置右键监听与菜单
-  /// - Parameters:
-  ///   - statusItem: 由 MenuBarExtraAccess 拿到的底层 NSStatusItem 实例
-  ///   - onRightClick: 右键触发时的闭包回调（例如收起左键展开的气泡浮窗）
-  func setup(statusItem: NSStatusItem, onRightClick: (() -> Void)? = nil) {
-    // 将传入值存起来 方便后续方法调用
-    self.statusItem = statusItem
-    self.onRightClickTriggered = onRightClick
+  // MARK: - Popover 显隐控制
+  func togglePopover(_ sender: NSStatusBarButton) {
+    if popover.isShown {
+      closePopover()
+    } else {
+      // 确保应用激活到前台，避免浮窗处于失焦状态
+      NSApp.activate(ignoringOtherApps: true)
+      popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+    }
+  }
 
-    buildMenu()
-    setupRightClickMonitor()
+  func closePopover() {
+    if popover.isShown {
+      popover.performClose(nil)
+    }
   }
 
   // MARK: - 构建菜单结构
@@ -119,56 +198,15 @@ class StatusBarMenuManager: NSObject {
     contextMenu.addItem(quitItem)
   }
 
-  // MARK: - 右键事件拦截监听
-  private func setupRightClickMonitor() {
-    // 防止重复注册
-    if let monitor = eventMonitor {
-      NSEvent.removeMonitor(monitor)
-    }
-
-    // 监听本地鼠标事件：拦截右键抬起（.rightMouseUp）以及带 Control 键的左键抬起
-    // 之所以用局部监视器而不是直接赋值 button.menu，是为了避免污染左键对 SwiftUI PopoverView 的正常弹出
-    eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseUp, .leftMouseUp]) {
-      [weak self] event in
-      guard let self = self,
-        let button = self.statusItem?.button,
-        event.window == button.window
-      else {
-        return event
-      }
-
-      // 判断是否为右键或 Control+左键
-      let isRightClick = event.type == .rightMouseUp
-      let isControlLeftClick = event.type == .leftMouseUp && event.modifierFlags.contains(.control)
-
-      guard isRightClick || isControlLeftClick else {
-        return event  // 普通左键点击，放行给 SwiftUI 默认逻辑（展开 PopoverView）
-      }
-
-      // 将窗口点击坐标转换为状态栏按钮自身的局部坐标
-      let locationInButton = button.convert(event.locationInWindow, from: nil)
-      if button.bounds.contains(locationInButton) {
-        // 如果左键浮窗当前正展开着，先平滑收起它
-        self.onRightClickTriggered?()
-
-        // 弹出右键菜单
-        self.showContextMenu(at: locationInButton)
-        return nil  // 消费拦截该事件，不继续向后传播
-      }
-      return event
-    }
-  }
-
-  private func showContextMenu(at point: NSPoint) {
-    guard let statusItem = statusItem, let button = statusItem.button else { return }
+  private func showContextMenu(for button: NSStatusBarButton) {
     refreshMenuCheckmarks()
 
     // 1. 临时挂载菜单到 statusItem
-    statusItem.menu = contextMenu
+    statusItem?.menu = contextMenu
     // 2. 触发系统原生状态栏菜单弹出（内部会同步阻塞直到菜单关闭）
     button.performClick(nil)
     // 3. 菜单关闭后立即清空，完全不影响后续左键点击弹出 SwiftUI PopoverView
-    statusItem.menu = nil
+    statusItem?.menu = nil
   }
 
   /// 弹出前重新同步最新的勾选状态
