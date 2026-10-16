@@ -14,6 +14,8 @@ class StatusBarMenuManager: NSObject {
   static let shared = StatusBarMenuManager()
 
   // AppKit 原生状态栏图标对象
+  // 保留强引用是必须的：NSStatusItem 一旦被 ARC 释放，状态栏图标会随之消失
+  // （改用 popUp(positioning:at:in:) 后不再读写它的 menu 属性，但图标本身仍靠这个属性常驻）
   private var statusItem: NSStatusItem?
   // AppKit 原生气泡浮窗容器（内部填充 SwiftUI）
   private var popover = NSPopover()
@@ -29,6 +31,16 @@ class StatusBarMenuManager: NSObject {
     static let enableSelectionPick = "enable_selection_pick"
     static let enableHoverPick = "enable_hover_pick"
     static let enableOcr = "enable_ocr"
+  }
+
+  // MARK: - 菜单项标签定义
+  // 用标签定位菜单项，替代 items[0]/items[1]/items[2] 这类硬编码下标：
+  // 以后在菜单中间插入新项、调整顺序或增删分隔线，都不会让勾选态串到别的项上
+  // 从 1 开始编号：NSMenuItem 未显式设置 tag 时默认是 0，避开 0 以免与“无标签”混淆
+  private enum MenuTag: Int {
+    case selectionPick = 1
+    case hoverPick = 2
+    case ocr = 3
   }
 
   // MARK: - 功能开关状态（绑定系统 UserDefaults，支持与 Flutter 共享）
@@ -159,6 +171,8 @@ class StatusBarMenuManager: NSObject {
       keyEquivalent: ""
     )
     selectionItem.target = self
+    // ⚠️ 枚举成员不是值本身 因此要加.rawValue取原始值
+    selectionItem.tag = MenuTag.selectionPick.rawValue  // 打标签，供 refreshMenuCheckmarks 按标签回查
     selectionItem.state = isSelectionPickEnabled ? .on : .off
     contextMenu.addItem(selectionItem)
 
@@ -169,6 +183,7 @@ class StatusBarMenuManager: NSObject {
       keyEquivalent: ""
     )
     hoverItem.target = self
+    hoverItem.tag = MenuTag.hoverPick.rawValue
     hoverItem.state = isHoverPickEnabled ? .on : .off
     contextMenu.addItem(hoverItem)
 
@@ -179,6 +194,7 @@ class StatusBarMenuManager: NSObject {
       keyEquivalent: ""
     )
     ocrItem.target = self
+    ocrItem.tag = MenuTag.ocr.rawValue
     ocrItem.state = isOcrEnabled ? .on : .off
     contextMenu.addItem(ocrItem)
 
@@ -198,21 +214,32 @@ class StatusBarMenuManager: NSObject {
   private func showContextMenu(for button: NSStatusBarButton) {
     refreshMenuCheckmarks()
 
-    // 1. 临时挂载菜单到 statusItem
-    statusItem?.menu = contextMenu
-    // 2. 触发系统原生状态栏菜单弹出（内部会同步阻塞直到菜单关闭）
-    button.performClick(nil)
-    // 3. 菜单关闭后立即清空，完全不影响后续左键点击弹出 SwiftUI PopoverView
-    statusItem?.menu = nil
+    // 现代 API：直接把菜单弹在状态栏图标正下方
+    // statusItem.menu 全程保持 nil，因此不切换 statusItem 的工作模式，左键点击依旧走 button.action 弹出 SwiftUI 浮窗
+    // popUp(positioning:at:in:) 三个入参的含义：
+    //   positioning: nil → 以菜单内容框的左上角（RTL 界面下为右上角）对齐到 at 指定的点
+    //   at: 坐标基于 in: 传入的视图（button 坐标系，原点在左下角）；x=0 与图标左边缘对齐，y=图标高度+5 让菜单挂在图标下方并留出间隙
+    //   in: button → 若菜单位置超出屏幕，系统会自动平移使其完整可见
+    // 该方法内部开启菜单事件跟踪循环，同步阻塞至用户选中某项或点击别处关闭菜单后才返回
+    // 返回值表示“菜单是否因选中某项而结束”，此处不关心，可安全丢弃
+    contextMenu.popUp(
+      positioning: nil,
+      at: NSPoint(x: 0, y: button.bounds.height + 5),
+      in: button
+    )
   }
 
   /// 弹出前重新同步最新的勾选状态
   private func refreshMenuCheckmarks() {
-    if contextMenu.items.count >= 3 {
-      contextMenu.items[0].state = isSelectionPickEnabled ? .on : .off
-      contextMenu.items[1].state = isHoverPickEnabled ? .on : .off
-      contextMenu.items[2].state = isOcrEnabled ? .on : .off
-    }
+    syncCheckmark(of: .selectionPick, to: isSelectionPickEnabled)
+    syncCheckmark(of: .hoverPick, to: isHoverPickEnabled)
+    syncCheckmark(of: .ocr, to: isOcrEnabled)
+  }
+
+  /// 按标签找到菜单项并刷新其勾选状态
+  /// item(withTag:) 返回可选值：菜单里没有该标签的项时静默跳过，不会像 items[下标] 那样越界崩溃
+  private func syncCheckmark(of tag: MenuTag, to isEnabled: Bool) {
+    contextMenu.item(withTag: tag.rawValue)?.state = isEnabled ? .on : .off
   }
 
   // MARK: - 菜单项点击响应
