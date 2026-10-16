@@ -26,14 +26,14 @@ class StatusBarMenuManager: NSObject {
   // NSMenu 是 macOS 原生 AppKit 框架中的菜单容器对象 屏幕顶部的主菜单栏、Dock 图标弹出的右键菜单，还是状态栏托盘图标的下拉菜单，底层都是 NSMenu
   private var contextMenu = NSMenu()
 
-  // MARK: - 持久化配置键名定义
+  // 持久化配置键名定义
   private enum PrefKeys {
     static let enableSelectionPick = "enable_selection_pick"
     static let enableHoverPick = "enable_hover_pick"
     static let enableOcr = "enable_ocr"
   }
 
-  // MARK: - 菜单项标签定义
+  // 菜单项标签定义
   // 用标签定位菜单项，替代 items[0]/items[1]/items[2] 这类硬编码下标：
   // 以后在菜单中间插入新项、调整顺序或增删分隔线，都不会让勾选态串到别的项上
   // 从 1 开始编号：NSMenuItem 未显式设置 tag 时默认是 0，避开 0 以免与“无标签”混淆
@@ -43,7 +43,7 @@ class StatusBarMenuManager: NSObject {
     case ocr = 3
   }
 
-  // MARK: - 功能开关状态（绑定系统 UserDefaults，支持与 Flutter 共享）
+  // 功能开关状态（绑定系统 UserDefaults，支持与 Flutter 共享）
   var isSelectionPickEnabled: Bool {
     // object 同localStorage的getItem
     get { UserDefaults.standard.object(forKey: PrefKeys.enableSelectionPick) as? Bool ?? true }
@@ -69,7 +69,7 @@ class StatusBarMenuManager: NSObject {
     super.init()
   }
 
-  // MARK: - 初始化绑定
+  // 初始化绑定
   /// 启动配置：以 AppKit 为底创建状态栏图标，配置 NSPopover（由 SwiftUI 填充）和右键菜单
   func setup() {
     // 1. 创建 AppKit 原生状态栏条目
@@ -114,6 +114,9 @@ class StatusBarMenuManager: NSObject {
         self?.closePopover()
       })
     )
+    // 没有这个会导致NSPopover显示时获取不到真实尺寸 然后因为AppKit坐标原点在左下角 导致swiftUI自适应缩小时顶部空出来
+    // 加了这句就使先计算swiftUI实际尺寸 再作为窗口初始尺寸
+    hostingController.sizingOptions = [.preferredContentSize]  // 让浮窗在 show 之前就拿到真实尺寸
     // 必须强引用到类属性，防止 setup() 返回后 ARC 立即释放这个局部变量
     // 若不保留，popover.contentViewController 会变成悬空引用
     popoverHostingController = hostingController
@@ -125,7 +128,8 @@ class StatusBarMenuManager: NSObject {
     buildMenu()
   }
 
-  // MARK: - 左右键点击分发
+  // 左右键点击分发
+  // 加 @objc 是为了适配#selector使其运行Objective-C时调用这个方法
   @objc private func handleStatusItemClick(_ sender: NSStatusBarButton) {
     guard let event = NSApp.currentEvent else { return }
 
@@ -144,7 +148,7 @@ class StatusBarMenuManager: NSObject {
     }
   }
 
-  // MARK: - Popover 显隐控制
+  // Popover 显隐控制
   func togglePopover(_ sender: NSStatusBarButton) {
     if popover.isShown {
       closePopover()
@@ -159,7 +163,7 @@ class StatusBarMenuManager: NSObject {
     }
   }
 
-  // MARK: - 构建菜单结构
+  // 构建菜单结构
   private func buildMenu() {
     // contextMenu.addItem(...) 追加元素会导致菜单里出现重复的选项
     contextMenu.removeAllItems()  // 防止菜单项被重复追加
@@ -242,7 +246,7 @@ class StatusBarMenuManager: NSObject {
     contextMenu.item(withTag: tag.rawValue)?.state = isEnabled ? .on : .off
   }
 
-  // MARK: - 菜单项点击响应
+  // 菜单项点击响应
   @objc private func toggleSelectionPick(_ sender: NSMenuItem) {
     isSelectionPickEnabled.toggle()
     sender.state = isSelectionPickEnabled ? .on : .off

@@ -8,7 +8,7 @@ class MainFlutterWindow: NSWindow {
     // 此时 self.frame 记录的是 Xib 模板中预设的原始尺寸
     let windowFrame = self.frame
     // 在 AppKit 机制中，当给窗口的 contentViewController 赋值时，NSWindow 会自动根据新控制器的默认视图尺寸来重置自身窗口的 frame
-    self.contentViewController = flutterViewController
+    self.contentViewController = flutterViewController  // 把 Flutter 引擎视图装进窗口
     // windowFrame 指定屏幕全局坐标系中的原点位置以及尺寸
     // display 窗口是否立即重绘
     // 如果写成 self.setFrame(self.frame, display: true)，获取到的 self.frame 已经在self.contentViewController = flutterViewController篡改了，无法恢复到 Xib 中的初始预设
