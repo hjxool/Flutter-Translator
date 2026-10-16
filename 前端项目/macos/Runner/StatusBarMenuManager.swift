@@ -92,7 +92,6 @@ class StatusBarMenuManager: NSObject {
       print("[StatusBar] ⚠️ button is nil！状态栏条目创建失败")
     }
 
-
     // 2. 配置 AppKit 浮窗容器 (NSPopover)
     popover.behavior = .transient  // 点击浮窗外部区域时系统自动平滑收起
     popover.animates = true
@@ -138,8 +137,6 @@ class StatusBarMenuManager: NSObject {
     if popover.isShown {
       closePopover()
     } else {
-      // 确保应用激活到前台，避免浮窗处于失焦状态
-      NSApp.activate(ignoringOtherApps: true)
       popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
     }
   }

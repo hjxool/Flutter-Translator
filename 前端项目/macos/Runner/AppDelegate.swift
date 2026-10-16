@@ -6,7 +6,7 @@ import FlutterMacOS
 class AppDelegate: FlutterAppDelegate {
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
-    // 强制将应用策略设为常规应用（保证可以被 activate 到最前台）
+    // 因为存在托盘图标因此可能被改成辅助/托盘应用 不会在启动时打开主界面 因此这里防御性修改下
     NSApp.setActivationPolicy(.regular)
 
     // 推迟到下一个 RunLoop 周期再初始化状态栏：
@@ -17,7 +17,6 @@ class AppDelegate: FlutterAppDelegate {
       StatusBarMenuManager.shared.setup()
     }
   }
-
 
   // 从 macOS 12 / iOS 15 开始，如果应用没有显式实现此方法，系统控制台或编译运行期就会打印一条告警（Warning），提示开发者未明确声明安全状态恢复策略
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
