@@ -28,6 +28,7 @@ class StatusBarMenuManager: NSObject {
 
   // 持久化配置键名定义
   private enum PrefKeys {
+    // 这种写法主要用于统一管理常量
     static let enableSelectionPick = "enable_selection_pick"
     static let enableHoverPick = "enable_hover_pick"
     static let enableOcr = "enable_ocr"
@@ -38,6 +39,7 @@ class StatusBarMenuManager: NSObject {
   // 以后在菜单中间插入新项、调整顺序或增删分隔线，都不会让勾选态串到别的项上
   // 从 1 开始编号：NSMenuItem 未显式设置 tag 时默认是 0，避开 0 以免与“无标签”混淆
   private enum MenuTag: Int {
+    // 标准枚举 可以当类型传递
     case selectionPick = 1
     case hoverPick = 2
     case ocr = 3
